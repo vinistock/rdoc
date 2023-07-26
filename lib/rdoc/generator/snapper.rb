@@ -24,7 +24,6 @@ module RDoc
       attr_reader :files
       attr_reader :json_index
       attr_reader :methods
-      attr_reader :modsort
       attr_reader :store
       attr_reader :template_dir
       attr_reader :outputdir
@@ -44,9 +43,9 @@ module RDoc
         @context = nil
 
         @classes = @store.all_classes_and_modules.sort
+        @grouped_classes = @classes.group_by { |klass| klass.full_name[/\A[^:]++(?:::[^:]++(?=::))*+(?=::[^:]*+\z)/] }
+        @methods = @store.all_classes_and_modules.flat_map(&:method_list).sort!
         @files   = @store.all_files.sort
-        @methods = @classes.flat_map(&:method_list).sort!
-        @modsort = @classes.select(&:display?)
 
         @json_index = JsonIndex.new(self, options)
       end
@@ -73,13 +72,30 @@ module RDoc
         generate_index
         generate_class_files
         generate_file_files
-        generate_table_of_contents
         @json_index.generate
         @json_index.generate_gzipped
         copy_static
       end
 
       private
+
+      # Generates the nested links for classes and modules in the sidebar
+      def create_sidebar_entries(klasses)
+        klasses.each_with_object(+"") do |klass, html|
+          html << if (children = @grouped_classes[klass.full_name])
+            <<~HTML
+              <li>
+                <details>
+                  <summary><a href="#{klass.path}">#{klass.name}</a></summary>
+                  #{create_sidebar_entries(children)}
+                </details>
+              </li>
+            HTML
+          else
+            "<a href=\"#{klass.path}\">#{klass.name}</a>"
+          end
+        end
+      end
 
       # Copy internal static files like CSS and JS from the generator's template
       def copy_internal_static_files
@@ -270,26 +286,6 @@ module RDoc
         raise error
       end
 
-      # Generate an index page which lists all the classes which are documented.
-      def generate_table_of_contents
-        template_file = @template_dir + "table_of_contents.rhtml"
-        return unless template_file.exist?
-
-        out_file = @outputdir + "table_of_contents.html"
-        rel_prefix = @outputdir.relative_path_from out_file.dirname
-        search_index_rel_prefix = rel_prefix
-        search_index_rel_prefix += @asset_rel_path if @file_output
-
-        asset_rel_prefix = rel_prefix + @asset_rel_path
-
-        @title = "Table of Contents - #{@options.title}"
-        render_template(template_file, out_file) { |io| binding }
-      rescue => e
-        error = Error.new("error generating table_of_contents.html: #{e.message} (#{e.class})")
-        error.set_backtrace(e.backtrace)
-        raise error
-      end
-
       # Creates a template from its components and the +body_file+.
       #
       # For backwards compatibility, if +body_file+ contains "<html" the body is
@@ -303,14 +299,13 @@ module RDoc
 
         <<~TEMPLATE
           <!DOCTYPE html>
-
           <html>
-          <head>
-          #{head_file.read}
-
-          #{body}
-
-          #{footer_file.read}
+            #{head_file.read}
+            <body>
+              #{body}
+              #{footer_file.read}
+            </body>
+          </html>
         TEMPLATE
       end
 

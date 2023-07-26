@@ -1,0 +1,12 @@
+.main-container {
+    display: flex;
+}
+
+#nav {
+    border-right: 1px solid black;
+    padding: 15px;
+}
+
+#navigation-list {
+    list-style-type: none;
+}
