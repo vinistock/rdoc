@@ -1,5 +1,10 @@
 <nav id="nav">
+  &lt;/&gt; <%= @title %>
+
   <ul id="navigation-list">
-    <%= create_sidebar_entries(@grouped_classes[nil]) %>
+    <p class="separator">PAGES</p>
+    <%= create_sidebar_page_entries(rel_prefix) %>
+    <p class="separator">CODE</p>
+    <%= create_sidebar_class_entries(@grouped_classes[nil], rel_prefix) %>
   </ul>
 </nav>

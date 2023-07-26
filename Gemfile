@@ -2,6 +2,8 @@ source 'https://rubygems.org'
 
 gemspec
 
+gem "debug"
+
 group :development do
   gem 'rake'
   gem 'racc', '> 1.4.10'
